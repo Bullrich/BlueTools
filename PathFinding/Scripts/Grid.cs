@@ -24,6 +24,8 @@ namespace Blue.Pathfinding
         float nodeDiameter;
         int gridSizeX, gridSizeY;
         private bool hasCreatedGrid = false;
+        private List<Transform> obstacles;
+        private Vector3[] obstaclesPosition;
 
         private float heightLimit;
 
@@ -41,10 +43,11 @@ namespace Blue.Pathfinding
                 walkableRegionsDictionary.Add((int)Mathf.Log(region.terrainMask.value, 2f), region.terrainPenalty);
             }
 
-            CreateGrid();
+            grid = CreateGrid();
         }
 
-        public void Start(){
+        public void Start()
+        {
             ValidatePaths();
             hasCreatedGrid = true;
         }
@@ -67,9 +70,10 @@ namespace Blue.Pathfinding
             return hasCreatedGrid;
         }
 
-        public void CreateGrid()
+        public Node[,] CreateGrid()
         {
-            grid = new Node[gridSizeX, gridSizeY];
+            obstacles = new List<Transform>();
+            Node[,] tempGrid = new Node[gridSizeX, gridSizeY];
             Vector3 worldBottomLeft = transform.position - Vector3.right * gridWorldSize.x / 2 - Vector3.forward * gridWorldSize.y / 2;
 
             for (int x = 0; x < gridSizeX; x++)
@@ -97,13 +101,39 @@ namespace Blue.Pathfinding
                                 walkableRegionsDictionary.TryGetValue(hit.collider.gameObject.layer, out movementPenalty);
                             }
                         }
+                        else
+                        {
+                            if (!obstacles.Contains(hitInfo.collider.transform))
+                                obstacles.Add(hitInfo.collider.transform);
+                        }
 
-                        grid[x, y] = new Node(walkable, worldPoint, x, y, movementPenalty);
+                        tempGrid[x, y] = new Node(walkable, worldPoint, x, y, movementPenalty);
                     }
                     else
                         throw new System.Exception(string.Format("Point {0}, {1} didn't hit anything when raycasting down", gridSizeX, gridSizeY));
                 }
             }
+            obstaclesPosition = new Vector3[obstacles.Count];
+            for (int i = 0; i < obstacles.Count; i++)
+                obstaclesPosition[i] = obstacles[i].position;
+            return tempGrid;
+        }
+
+        private bool GridHasChange()
+        {
+            for (int i = 0; i < obstacles.Count; i++)
+                if (obstaclesPosition[i] != obstacles[i].position)
+                    return true;
+            return false;
+        }
+
+        public bool CheckGridStatus()
+        {
+            bool changeOcurred = GridHasChange();
+            if (changeOcurred)
+                grid = CreateGrid();
+            return changeOcurred;
+
         }
 
         public List<Node> GetNeighbours(Node node)

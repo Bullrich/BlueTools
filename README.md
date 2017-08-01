@@ -1,8 +1,10 @@
 # Blue Tools
 
-### This is a recopilation of tools I made for several unity projects
+### This is a recopilation of tools for several unity projects
 
 Be aware that this isn't a project, but a folder, import this **inside** a unity project.
+
+Half of them I learned them from school, watching a guide or reading a book, I optimized them for my needs.
 
 The tools here are mostly AI.
 

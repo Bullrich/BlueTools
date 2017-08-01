@@ -5,55 +5,68 @@ namespace Blue.Pathfinding
 {
     public class Unit : MonoBehaviour
     {
-        float speed = 20;
+        public float speed = 20;
         Vector3[] path;
+
         int targetIndex;
 
         private bool hasRequestedPath = false;
 
-        public void OnPathFound(Vector3[] newPath, bool pathSuccessful)
+        protected Vector3 waypoint, targetPosition;
+
+        protected void OnPathFound(Vector3[] newPath, bool pathSuccessful)
         {
             hasRequestedPath = false;
             if (pathSuccessful)
             {
-                StopCoroutine(FollowPath());
                 path = newPath;
                 targetIndex = 0;
-                StartCoroutine(FollowPath());
+                waypoint = path[0];
+                targetPosition = path[path.Length - 1];
+                PathRequestManager.SuscribeToChange(SuscriptionToChange);
             }
         }
 
-        IEnumerator FollowPath()
+        private void SuscriptionToChange()
         {
-            Vector3 currentWaypoint = path[0];
-            while (true)
-            {
-                float distance = Vector3.Distance(transform.position, currentWaypoint);
-                if (distance < .5f)
-                {
-                    targetIndex++;
-                    if (targetIndex >= path.Length)
-                    {
-                        yield break;
-                    }
-                    currentWaypoint = path[targetIndex];
-                }
-
-                MoveTo(currentWaypoint);
-                yield return null;
-            }
+            NavigateToPoint(transform.position, targetPosition);
         }
 
-        public void MoveTo(Vector3 targetPos){
+        private void MoveThroughPath(ref Vector3 currentWaypoint)
+        {
+            float distance = Vector3.Distance(transform.position, currentWaypoint);
+            if (distance < .5f)
+            {
+                targetIndex++;
+                if (targetIndex >= path.Length)
+                {
+                    path = null;
+                    PathRequestManager.RemoveFromChange(SuscriptionToChange);
+                    return;
+                }
+                currentWaypoint = path[targetIndex];
+            }
+            MoveTo(currentWaypoint);
+        }
+
+        public virtual void Update()
+        {
+            if (path != null)
+                MoveThroughPath(ref waypoint);
+        }
+
+        public virtual void MoveTo(Vector3 targetPos)
+        {
             transform.position = Vector3.MoveTowards(transform.position, targetPos, speed * Time.deltaTime);
         }
 
         /// <summary>Navigate to a point in the map evading all the unwalkable objects</summary>
         public void NavigateToPoint(Vector3 pathStart, Vector3 pathEnd)
         {
-            if(!hasRequestedPath){
-            PathRequestManager.RequestPath(pathStart, pathEnd, OnPathFound);
-            hasRequestedPath = true;
+            if (!hasRequestedPath)
+            {
+                PathRequestManager.RequestPath(pathStart, pathEnd, OnPathFound);
+                hasRequestedPath = true;
             }
         }
 

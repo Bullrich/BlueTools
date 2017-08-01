@@ -10,7 +10,7 @@ namespace Blue.Pathfinding
         PathRequestManager requestManager;
         Grid grid;
 
-       public bool useTheta;
+        public bool useTheta;
 
         void Awake()
         {
@@ -173,7 +173,7 @@ namespace Blue.Pathfinding
             waypoints.Add(path[0].worldPosition);
             for (int i = 0; i < path.Count; i++)
             {
-                for (int j = path.Count-1; j > i; j--)
+                for (int j = path.Count - 1; j > i; j--)
                 {
                     float distance = Vector3.Distance(path[i].worldPosition, path[j].worldPosition);
                     // have to change unwalkable mask to somethin more usefull
@@ -235,6 +235,11 @@ namespace Blue.Pathfinding
                         return resultNode;
                 }
             }
+        }
+
+        public bool GetGridChange()
+        {
+            return grid.CheckGridStatus();
         }
     }
 }

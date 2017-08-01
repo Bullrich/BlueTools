@@ -11,10 +11,18 @@ namespace Blue.Pathfinding
         Queue<PathRequest> pathRequestQueue = new Queue<PathRequest>();
         PathRequest currentPathRequest;
 
+        [Range(0, 5f)]
+        [SerializeField]
+        private float checkGridStatusLapse = 0;
+        private float timeSinceCheck;
+
         static PathRequestManager instance;
         Pathfinding pathfinding;
 
         bool isProcessingPath;
+
+        public delegate void gridChange();
+        private static List<gridChange> changeSuscriptors = new List<gridChange>();
 
         void Awake()
         {
@@ -33,19 +41,29 @@ namespace Blue.Pathfinding
         }
 
         /// <summary>Request a random path for patrolling</summary>
-        public static void RequestRandomPath(Vector3 pathStart, int pathLength ,Action<Vector3[], bool> callback)
+        public static void RequestRandomPath(Vector3 pathStart, int pathLength, Action<Vector3[], bool> callback)
         {
             Pathfinding pathfinding = instance.pathfinding;
             Node startNode = pathfinding.convertPosToNode(pathStart);
             Node randomNode = pathfinding.getRandomNodeAtDistance(startNode, pathLength);
-            if(randomNode != null){
-            //print(string.Format("Path start: {0}|{1}, pathEnd: {2}|{3}",startNode.gridX,startNode.gridY, randomNode.gridX,randomNode.gridY));
-            PathRequest newRequest = new PathRequest(startNode, randomNode, callback);
-            instance.pathRequestQueue.Enqueue(newRequest);
-            instance.TryProcessNext();
+            if (randomNode != null)
+            {
+                PathRequest newRequest = new PathRequest(startNode, randomNode, callback);
+                instance.pathRequestQueue.Enqueue(newRequest);
+                instance.TryProcessNext();
             }
             else
-            Debug.LogError("Node not found!");
+                Debug.LogError("Node not found!");
+        }
+
+        public static void SuscribeToChange(gridChange change)
+        {
+            changeSuscriptors.Add(change);
+        }
+
+        public static void RemoveFromChange(gridChange change)
+        {
+            changeSuscriptors.Remove(change);
         }
 
         void TryProcessNext()
@@ -70,6 +88,22 @@ namespace Blue.Pathfinding
             TryProcessNext();
         }
 
+        private void Update()
+        {
+            // Checks if there was a change on the grid
+            if (checkGridStatusLapse > 0 && changeSuscriptors.Count > 0)
+            {
+                timeSinceCheck += Time.time;
+                if (timeSinceCheck > checkGridStatusLapse)
+                {
+                    timeSinceCheck = 0;
+                    if (pathfinding.GetGridChange())
+                        foreach (gridChange suscriptor in changeSuscriptors)
+                            suscriptor();
+                }
+            }
+        }
+
         public static int GetDistanceFromPoints(Vector3 startPos, Vector3 endPos)
         {
             return instance.pathfinding.GetDistanceNodes(startPos, endPos);
@@ -80,7 +114,8 @@ namespace Blue.Pathfinding
             public Node pathStart, pathEnd;
             public Action<Vector3[], bool> callback;
 
-            public PathRequest(Node _start, Node _end, Action<Vector3[], bool> _callback){
+            public PathRequest(Node _start, Node _end, Action<Vector3[], bool> _callback)
+            {
                 pathStart = _start;
                 pathEnd = _end;
                 callback = _callback;

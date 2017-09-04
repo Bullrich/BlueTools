@@ -8,49 +8,50 @@ namespace Blue.Pathfinding
     [RequireComponent(typeof(Pathfinding))]
     public class PathRequestManager : MonoBehaviour
     {
-        Queue<PathRequest> pathRequestQueue = new Queue<PathRequest>();
-        PathRequest currentPathRequest;
+        private readonly Queue<PathRequest> _pathRequestQueue = new Queue<PathRequest>();
+        private PathRequest _currentPathRequest;
 
-        [Range(0, 5f)]
-        [SerializeField]
-        private float checkGridStatusLapse = 0;
-        private float timeSinceCheck;
+        [Range(0, 5f)] [SerializeField] private float checkGridStatusLapse = 0;
+        private float _timeSinceCheck;
 
-        static PathRequestManager instance;
-        Pathfinding pathfinding;
+        private static PathRequestManager _instance;
+        private Pathfinding _pathfinding;
 
-        bool isProcessingPath;
+        private bool _isProcessingPath;
 
         public delegate void gridChange();
-        private static List<gridChange> changeSuscriptors = new List<gridChange>();
 
-        void Awake()
+        private static readonly List<gridChange> changeSuscriptors = new List<gridChange>();
+
+        private void Awake()
         {
-            instance = this;
-            pathfinding = GetComponent<Pathfinding>();
+            _instance = this;
+            _pathfinding = GetComponent<Pathfinding>();
         }
 
         /// <summary>Request a way of traveling from one point to another</summary>
-        public static void RequestPath(Vector3 pathStart, Vector3 pathEnd, Action<Vector3[], bool> callback)
+        /// <para>It will return an array, if the array's length is zero, it means it didn't found a path</para>
+        /// <param name="callback">Callback that accepts a Vector3[]. An empty array means no path was found</param>
+        public static void RequestPath(Vector3 pathStart, Vector3 pathEnd, Action<Vector3[]> callback)
         {
-            Pathfinding pathfinding = instance.pathfinding;
+            Pathfinding pathfinding = _instance._pathfinding;
             PathRequest newRequest = new PathRequest(
-                pathfinding.convertPosToNode(pathStart), pathfinding.convertPosToNode(pathEnd), callback);
-            instance.pathRequestQueue.Enqueue(newRequest);
-            instance.TryProcessNext();
+                pathfinding.ConvertPosToNode(pathStart), pathfinding.ConvertPosToNode(pathEnd), callback);
+            _instance._pathRequestQueue.Enqueue(newRequest);
+            _instance.TryProcessNext();
         }
 
         /// <summary>Request a random path for patrolling</summary>
-        public static void RequestRandomPath(Vector3 pathStart, int pathLength, Action<Vector3[], bool> callback)
+        public static void RequestRandomPath(Vector3 pathStart, int pathLength, Action<Vector3[]> callback)
         {
-            Pathfinding pathfinding = instance.pathfinding;
-            Node startNode = pathfinding.convertPosToNode(pathStart);
-            Node randomNode = pathfinding.getRandomNodeAtDistance(startNode, pathLength);
+            Pathfinding pathfinding = _instance._pathfinding;
+            Node startNode = pathfinding.ConvertPosToNode(pathStart);
+            Node randomNode = pathfinding.GetRandomNodeAtDistance(startNode, pathLength);
             if (randomNode != null)
             {
                 PathRequest newRequest = new PathRequest(startNode, randomNode, callback);
-                instance.pathRequestQueue.Enqueue(newRequest);
-                instance.TryProcessNext();
+                _instance._pathRequestQueue.Enqueue(newRequest);
+                _instance.TryProcessNext();
             }
             else
                 Debug.LogError("Node not found!");
@@ -66,25 +67,24 @@ namespace Blue.Pathfinding
             changeSuscriptors.Remove(change);
         }
 
-        void TryProcessNext()
+        private void TryProcessNext()
         {
-            if (!isProcessingPath && pathRequestQueue.Count > 0)
-            {
-                currentPathRequest = pathRequestQueue.Dequeue();
-                isProcessingPath = true;
-                pathfinding.StartFindPath(currentPathRequest.pathStart, currentPathRequest.pathEnd);
-            }
+            if (_isProcessingPath || _pathRequestQueue.Count <= 0) return;
+            
+            _currentPathRequest = _pathRequestQueue.Dequeue();
+            _isProcessingPath = true;
+            _pathfinding.StartFindPath(_currentPathRequest.PathStart, _currentPathRequest.PathEnd);
         }
 
         public bool FindIfAccesible(Vector3 startPos, Vector3 endPos)
         {
-            return instance.pathfinding.FoundIfAccesible(startPos, endPos);
+            return _instance._pathfinding.FoundIfAccesible(startPos, endPos);
         }
 
-        public void FinishedProcessingPath(Vector3[] path, bool success)
+        public void FinishedProcessingPath(Vector3[] path)
         {
-            currentPathRequest.callback(path, success);
-            isProcessingPath = false;
+            _currentPathRequest.Callback(path);
+            _isProcessingPath = false;
             TryProcessNext();
         }
 
@@ -92,35 +92,37 @@ namespace Blue.Pathfinding
         {
             // Checks if there was a change on the grid
             if (checkGridStatusLapse > 0 && changeSuscriptors.Count > 0)
-            {
-                timeSinceCheck += Time.time;
-                if (timeSinceCheck > checkGridStatusLapse)
-                {
-                    timeSinceCheck = 0;
-                    if (pathfinding.GetGridChange())
-                        foreach (gridChange suscriptor in changeSuscriptors)
-                            suscriptor();
-                }
-            }
+                UpdateGridStatus();
+        }
+
+        private void UpdateGridStatus()
+        {
+            _timeSinceCheck += Time.time;
+            if (!(_timeSinceCheck > checkGridStatusLapse)) return;
+            _timeSinceCheck = 0;
+
+            if (!_pathfinding.GetGridChange()) return;
+            
+            foreach (gridChange suscriptor in changeSuscriptors)
+                suscriptor();
         }
 
         public static int GetDistanceFromPoints(Vector3 startPos, Vector3 endPos)
         {
-            return instance.pathfinding.GetDistanceNodes(startPos, endPos);
+            return _instance._pathfinding.GetDistanceNodes(startPos, endPos);
         }
 
-        struct PathRequest
+        private struct PathRequest
         {
-            public Node pathStart, pathEnd;
-            public Action<Vector3[], bool> callback;
+            public readonly Node PathStart, PathEnd;
+            public readonly Action<Vector3[]> Callback;
 
-            public PathRequest(Node _start, Node _end, Action<Vector3[], bool> _callback)
+            public PathRequest(Node start, Node end, Action<Vector3[]> callback)
             {
-                pathStart = _start;
-                pathEnd = _end;
-                callback = _callback;
+                PathStart = start;
+                PathEnd = end;
+                Callback = callback;
             }
-
         }
     }
 }

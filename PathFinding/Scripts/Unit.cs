@@ -6,25 +6,27 @@ namespace Blue.Pathfinding
     public class Unit : MonoBehaviour
     {
         public float speed = 20;
-        Vector3[] path;
+        private Vector3[] _path;
 
-        int targetIndex;
+        private int _targetIndex;
 
-        private bool hasRequestedPath = false;
+        private bool _hasRequestedPath = false;
 
         protected Vector3 waypoint, targetPosition;
+        public bool showPath = true;
 
-        protected void OnPathFound(Vector3[] newPath, bool pathSuccessful)
+        protected void OnPathFound(Vector3[] newPath)
         {
-            hasRequestedPath = false;
-            if (pathSuccessful)
-            {
-                path = newPath;
-                targetIndex = 0;
-                waypoint = path[0];
-                targetPosition = path[path.Length - 1];
-                PathRequestManager.SuscribeToChange(SuscriptionToChange);
-            }
+            _hasRequestedPath = false;
+
+            if (newPath.Length <= 0) return;
+            
+            _path = newPath;
+            _targetIndex = 0;
+            waypoint = _path[0];
+            targetPosition = _path[_path.Length - 1];
+            // While following the path, adds a verification and makes sure that, if the grid change, it's path should be updated
+            PathRequestManager.SuscribeToChange(SuscriptionToChange);
         }
 
         private void SuscriptionToChange()
@@ -32,26 +34,28 @@ namespace Blue.Pathfinding
             NavigateToPoint(transform.position, targetPosition);
         }
 
+        /// <summary>Move to the waypoint, when close enough switchs to the next waypoint</summary>
         private void MoveThroughPath(ref Vector3 currentWaypoint)
         {
             float distance = Vector3.Distance(transform.position, currentWaypoint);
             if (distance < .5f)
             {
-                targetIndex++;
-                if (targetIndex >= path.Length)
+                _targetIndex++;
+                if (_targetIndex >= _path.Length)
                 {
-                    path = null;
+                    _path = null;
+                    // When it reaches it's target, it unsuscribe from the grid update.
                     PathRequestManager.RemoveFromChange(SuscriptionToChange);
                     return;
                 }
-                currentWaypoint = path[targetIndex];
+                currentWaypoint = _path[_targetIndex];
             }
             MoveTo(currentWaypoint);
         }
 
         public virtual void Update()
         {
-            if (path != null)
+            if (_path != null)
                 MoveThroughPath(ref waypoint);
         }
 
@@ -63,26 +67,22 @@ namespace Blue.Pathfinding
         /// <summary>Navigate to a point in the map evading all the unwalkable objects</summary>
         public void NavigateToPoint(Vector3 pathStart, Vector3 pathEnd)
         {
-            if (!hasRequestedPath)
-            {
-                PathRequestManager.RequestPath(pathStart, pathEnd, OnPathFound);
-                hasRequestedPath = true;
-            }
+            if (_hasRequestedPath || pathEnd == Vector3.zero) return;
+            
+            PathRequestManager.RequestPath(pathStart, pathEnd, OnPathFound);
+            _hasRequestedPath = true;
         }
 
         public void OnDrawGizmos()
         {
-            if (path != null)
+            if (_path != null && showPath)
             {
-                for (int i = targetIndex; i < path.Length; i++)
+                for (int i = _targetIndex; i < _path.Length; i++)
                 {
                     Gizmos.color = Color.black;
-                    Gizmos.DrawCube(path[i], Vector3.one);
+                    Gizmos.DrawCube(_path[i], Vector3.one);
 
-                    if (i == targetIndex)
-                        Gizmos.DrawLine(transform.position, path[i]);
-                    else
-                        Gizmos.DrawLine(path[i - 1], path[i]);
+                    Gizmos.DrawLine(i == _targetIndex ? transform.position : _path[i - 1], _path[i]);
                 }
             }
         }

@@ -19,5 +19,12 @@ namespace Blue.Utility
             var u = Mathf.Cos(phi);
             return new Vector3(Mathf.Sqrt(1 - u * u) * Mathf.Cos(theta), Mathf.Sqrt(1 - u * u) * Mathf.Sin(theta), u);
         }
+        
+        public static float AngleBetween(Vector3 v1, Vector3 v2)
+        {
+            float dot = Vector3.Dot(v1, v2);
+            float theta = (float) Mathf.Acos(dot / (v1.magnitude * v2.magnitude));
+            return theta;
+        }
     }
 }
